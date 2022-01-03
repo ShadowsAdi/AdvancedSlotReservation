@@ -89,7 +89,7 @@ public SV_ClientConnect_Pre(id)
 	new iPlayers = get_playersnum_ex()
 
 	/* If connected players num is lower than 32, stop the function */
-	if(iPlayers != MAX_PLAYERS)
+	if(iPlayers != g_iMaxPlayers)
 	{
 		return
 	}
