@@ -13,6 +13,7 @@
 #define AUTHOR  "Shadows Adi"
 
 new Array:g_aReservedIPs
+new g_iMaxPlayers
 
 public plugin_init()
 {
@@ -28,10 +29,9 @@ public plugin_init()
 	RegisterHookChain(RH_SV_ConnectClient, "SV_ClientConnect_Pre")
 
 	g_aReservedIPs = ArrayCreate(MAX_IP_LENGTH)
-}
 
-public OnConfigsExecuted()
-{
+	g_iMaxPlayers = get_member_game(m_nMaxPlayers)
+
 	/* Setting this cvar to let the player trigger SV_ConnectClient() function, followed by SV_ConnectClient_internal() function, finally checking if there is
 	any player slot free in SV_FindEmptySlot() function
 
@@ -40,10 +40,12 @@ public OnConfigsExecuted()
 		SV_FindEmptySlot call: 			https://github.com/dreamstalker/rehlds/blob/master/rehlds/engine/sv_main.cpp#L2385-L2387
 		SV_FindEmptySlot function: 		https://github.com/dreamstalker/rehlds/blob/master/rehlds/engine/sv_main.cpp#L2236-L2259 
 	*/
+	
+	set_pcvar_num(get_cvar_pointer("sv_visiblemaxplayers"), g_iMaxPlayers + 1 /* We just need one more slot */)
+}
 
-
-	set_pcvar_num(get_cvar_pointer("sv_visiblemaxplayers"), 33 /* We just need one more slot */)
-
+public OnConfigsExecuted()
+{
 	ReadFile()
 }
 
