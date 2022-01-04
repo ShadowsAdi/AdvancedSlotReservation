@@ -226,11 +226,7 @@ public SV_ClientConnect_Pre(id)
 		}
 	}
 
-	if(!bFound)
-	{
-		return
-	}
-	else
+	if(bFound)
 	{
 		new iPlayers[MAX_PLAYERS], iNum, iPlayer, iCount, bool:bSkip[2]
 		get_players(iPlayers, iNum)
