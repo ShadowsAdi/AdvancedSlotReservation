@@ -12,26 +12,39 @@
 #define MAX_IP_LENGTH 16
 #endif
 
+/* Engine const https://github.com/dreamstalker/rehlds/blob/master/rehlds/engine/info.h#L37 */
+#define MAX_INFO_STRING 256
+
+#define MAX_STRING 256
+
+#define MAX_USER_INFO_PASSWORD 32
+
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.1"
+#define VERSION "1.2"
 #define AUTHOR  "Shadows Adi"
 
-new const name_field[] 		= 			"name"
+new const name_field[] 			= 			"name"
 
-new const INCLUDE_ADMINS[] 	=			"INCLUDE_ADMINS"
-new const INCLUDE_BOTS[] 	=			"INCLUDE_BOTS"
-new const RELOAD_FILE[] 	=			"RELOAD_FILE_ACCESS"
+new const INCLUDE_ADMINS[] 		=			"INCLUDE_ADMINS"
+new const INCLUDE_BOTS[] 		=			"INCLUDE_BOTS"
+new const KICK_SPECTATOR[]		=			"KICK_SPECTATOR"
+new const KICK_PLAYER_BY_PTIME[]=			"KICK_PLAYER_BY_PLAYTIME"
+new const RELOAD_FILE[] 		=			"RELOAD_FILE_ACCESS"
+new const ADMIN_IMMUNITY_FLAG[] =			"ADMIN_IMMUNITY_FLAG"
+new const KICK_MESSAGE[]		=			"KICK_MESSAGE"
+new const USER_PASS_FIELD[]		=			"USERINFO_PASSWORD_FIELD"
 
 enum _:Enum_Data
 {
 	szBuffer[MAX_NAME_LENGTH],
-	szValue[3]
+	szValue[MAX_STRING]
 }
 
 enum _:Enum_PData
 {
 	szIP[MAX_IP_LENGTH],
-	szName[MAX_NAME_LENGTH]
+	szName[MAX_NAME_LENGTH],
+	szPassword[MAX_USER_INFO_PASSWORD]
 }
 
 enum
@@ -40,11 +53,23 @@ enum
 	iReservedSlots
 }
 
+enum
+{
+	iNone = 0,
+	iMostPlayedTime,
+	iLesserPlayedTime
+}
+
 enum _:Enum_Settings
 {
-	bool:IncludeAdmins,
-	bool:IncludeBots,
-	szAccess[2]
+	bool:bIncludeAdmins,
+	bool:bIncludeBots,
+	szAccess[2],
+	bool:bKickSpectator,
+	iKickByPlayedTime,
+	szImmunityFlag[2],
+	szKickMessage[MAX_STRING],
+	szPassField[16]
 }
 
 new Array:g_aReservedSlot
@@ -110,9 +135,11 @@ ReadFile()
 
 	new iFile = fopen(szFileName, "rt")
 
+	ArrayClear(g_aReservedSlot)
+
 	if(iFile)
 	{
-		new szData[48], szTemp[Enum_Data], iSection
+		new szData[MAX_INFO_STRING], szTemp[Enum_Data], iSection
 
 		while(fgets(iFile, szData, charsmax(szData)))
 		{
@@ -137,15 +164,35 @@ ReadFile()
 
 					if(equali(szTemp[szBuffer], INCLUDE_ADMINS))
 					{
-						g_szSettings[IncludeAdmins] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+						g_szSettings[bIncludeAdmins] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
 					}
 					else if(equali(szTemp[szBuffer], INCLUDE_BOTS))
 					{
-						g_szSettings[IncludeBots] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+						g_szSettings[bIncludeBots] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+					}
+					else if(equali(szTemp[szBuffer], KICK_SPECTATOR))
+					{
+						g_szSettings[bKickSpectator] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+					}
+					else if(equali(szTemp[szBuffer], KICK_PLAYER_BY_PTIME))
+					{
+						g_szSettings[iKickByPlayedTime] = clamp(str_to_num(szTemp[szValue]), 0, 2)
 					}
 					else if(equali(szTemp[szBuffer], RELOAD_FILE))
 					{
 						copy(g_szSettings[szAccess], charsmax(g_szSettings[szAccess]), szTemp[szValue])
+					}
+					else if(equali(szTemp[szBuffer], ADMIN_IMMUNITY_FLAG))
+					{
+						copy(g_szSettings[szImmunityFlag], charsmax(g_szSettings[szImmunityFlag]), szTemp[szValue])
+					}
+					else if(equali(szTemp[szBuffer], USER_PASS_FIELD))
+					{
+						copy(g_szSettings[szPassField], charsmax(g_szSettings[szPassField]), szTemp[szValue])
+					}
+					else if(equali(szTemp[szBuffer], KICK_MESSAGE))
+					{
+						copy(g_szSettings[szKickMessage], charsmax(g_szSettings[szKickMessage]), szTemp[szValue])
 					}
 				}
 				case iReservedSlots:
@@ -182,98 +229,179 @@ public SV_ClientConnect_Pre(id)
 
 	/* If connected players num is lower than 32, stop the function */
 	if(iPlayers != g_iMaxPlayers)
-	{
 		return
-	}
 
-	new szPlayerData[Enum_PData], eArray[Enum_Data], bool:bFound, szTemp[1024]
+	new szPlayerData[Enum_PData], eArray[Enum_Data], bool:bFound, szTemp[MAX_INFO_STRING] 
 	
 	/* Retrieving connecting player's IP address also his name to check them later... */
 	rh_get_net_from(szPlayerData[szIP], charsmax(szPlayerData[szIP]))
-	read_args(szTemp, charsmax(szTemp))
 
-	new iPos = containi(szTemp, name_field)
+	/* Fourth agrument is always userinfo */
+	read_argv(4, szTemp, charsmax(szTemp))
 
-	if(iPos != -1)
+	new iPosName = containi(szTemp, name_field), iPosPassword = containi(szTemp, g_szSettings[szPassField])
+
+	if(iPosName != -1)
 	{
-		/* iPos shows the position in the string and adding 5 will skip 5 characters  : "name " */
-		copyc(szPlayerData[szName], charsmax(szPlayerData[szName]), szTemp[iPos + 5], '\')
+		/* iPosName shows the position in the userinfo for name and adding 5 will skip 5 characters  : "name\" */
+		copyc(szPlayerData[szName], charsmax(szPlayerData[szName]), szTemp[iPosName + 5], '\')
+	}
+
+	if(iPosPassword != -1)
+	{
+		/* iPosPassword shows the position in the userinfo for password and adding strlen() of g_szSettings[szPassField] */
+		copyc(szPlayerData[szPassword], charsmax(szPlayerData[szPassword]), szTemp[iPosPassword + strlen(g_szSettings[szPassField]) + 1], '\')
 	}
 
 	for(new i; i < ArraySize(g_aReservedSlot); i++)
 	{
 		ArrayGetArray(g_aReservedSlot, i, eArray, charsmax(eArray))
 
-		/* Searching for player's reserved data in array. If found, then the function can begin it's verification proccess */
-		switch(eArray[szValue][0])
+		if(is_player_reserved(szPlayerData, eArray))
 		{
-			case 'I':
-			{
-				if(equali(szPlayerData[szIP], eArray[szBuffer], strlen(szPlayerData[szIP])))
-				{
-					bFound = true
-					break
-				}
-			}
-			case 'N':
-			{
-				if(equali(szPlayerData[szName], eArray[szBuffer], strlen(szPlayerData[szName])))
-				{
-					bFound = true
-					break
-				}
-			}
+			bFound = true
+			break
 		}
 	}
 
 	if(bFound)
 	{
-		new iPlayers[MAX_PLAYERS], iNum, iPlayer, iCount, bool:bSkip[2]
-		get_players(iPlayers, iNum)
+		new iPlayers[MAX_PLAYERS], iSelected[MAX_PLAYERS], iNum, iPlayer, iCount, bool:bInclude[2]
+		get_players_filtered(iPlayers, iNum)
 
-		bSkip[0] = g_szSettings[IncludeAdmins]
-		bSkip[1] = g_szSettings[IncludeBots]
+		bInclude[0] = g_szSettings[bIncludeAdmins]
+		bInclude[1] = g_szSettings[bIncludeBots]
 
 		for(new i; i < iNum; i++)
 		{
 			iPlayer = iPlayers[i]
 
-			if(bSkip[0] && is_user_admin(iPlayer))
-			{
-				iCount++
+			if(!bInclude[0] && has_flag(iPlayer, g_szSettings[szImmunityFlag]) || !bInclude[1] && is_user_bot_hltv(iPlayer))
 				continue
-			}
 
-			if(bSkip[1] && (is_user_bot(iPlayer) || is_user_hltv(iPlayer)))
-			{
-				iCount++
-				continue
-			}
-
+			iSelected[iCount] = iPlayer
 			iCount++
 		}
 
-		new iRandom, iLooped
+		new iRandomPlayer = -1, bool:bChecked
 
-		again:
-		iRandom = random_num(1, iCount)
-
-		 /* Checking if user is not admin, bot or hltv, depends on settings, as well, to avoid infinite loop, we check this three times, I think it's enough */
-		if(iLooped < 3 && (!bSkip[0] && is_user_admin(iRandom) || !bSkip[1] && is_user_bot_hltv(iRandom)))
+		switch(g_szSettings[iKickByPlayedTime])
 		{
-			iLooped++
-			goto again
+			case iMostPlayedTime, iLesserPlayedTime:
+			{
+				bChecked = true
+				iRandomPlayer = get_player_by_playtime(iSelected, iCount, g_szSettings[iKickByPlayedTime])
+			}
 		}
 
-		rh_drop_client(iPlayers[iRandom], "Kicked due reserved slot!")
+		if(iRandomPlayer == -1)
+		{
+			get_random_player(iRandomPlayer, iCount - 1)
+		}
+
+		if(!is_user_connected(bChecked ? iRandomPlayer : iSelected[iRandomPlayer]))
+			return
+
+		rh_drop_client(bChecked ? iRandomPlayer : iSelected[iRandomPlayer], g_szSettings[szKickMessage])
 	}
 }
 
 bool:is_user_bot_hltv(id)
 {
 	if(is_user_bot(id) || is_user_hltv(id))
-	{
 		return true 
+
+	return false
+}
+
+bool:get_players_filtered(iPlayers[MAX_PLAYERS], &iNum)
+{
+	new bool:bCustomFilter
+
+	if(g_szSettings[bKickSpectator])
+		bCustomFilter = true
+
+	recount:
+	get_players(iPlayers, iNum, bCustomFilter ? "e" : "", bCustomFilter ? "SPECTATOR" : "")
+
+	if(!iNum && g_szSettings[bKickSpectator])
+	{
+		bCustomFilter = false
+		goto recount
+	}
+
+	return true
+}
+
+get_random_player(&iNum, iCount)
+{
+	iNum = iCount > 1 ? random_num(1, iCount) : 0
+}
+
+get_player_by_playtime(iPlayers[MAX_PLAYERS], iCount, iCriteria)
+{
+	if(!iCount)	
+		return -1
+
+	new iTempID
+	SortCustom1D(iPlayers, iCount, "compare_playtime")
+
+	switch(iCriteria)
+	{
+		case iMostPlayedTime:
+		{
+			iTempID = iPlayers[0]
+		}
+		case iLesserPlayedTime:
+		{
+			iTempID = iPlayers[iCount - 1]
+		}
+	}
+
+	return iTempID
+}
+
+public compare_playtime(iPlayer1, iPlayer2)
+{
+	new iPTime[2]
+	iPTime[0] = get_user_time(iPlayer1, 1)
+	iPTime[1] = get_user_time(iPlayer2, 1)
+
+	if(iPTime[0] > iPTime[1])
+		return -1
+	else if(iPTime[0] < iPTime[1])
+		return 1
+
+	return 0
+}
+
+bool:is_player_reserved(szPData[Enum_PData], szArray[Enum_Data])
+{
+	/* Searching for player's reserved data in array. If found, then the function can begin it's verification proccess */
+
+	switch(szArray[szValue][0])
+	{
+		case 'N':
+		{
+			if(equali(szPData[szName], szArray[szBuffer], charsmax(szPData[szName])))
+			{
+				return true
+			}
+		}
+		case 'P':
+		{
+			if(equali(szPData[szPassword], szArray[szBuffer], charsmax(szPData[szPassword])))
+			{
+				return true
+			}
+		}
+		case 'I':
+		{
+			if(equali(szPData[szIP], szArray[szBuffer], charsmax(szPData[szIP])))
+			{
+				return true
+			}
+		}
 	}
 
 	return false
