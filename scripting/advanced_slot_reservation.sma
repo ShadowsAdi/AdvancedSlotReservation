@@ -225,10 +225,8 @@ public plugin_end()
 
 public SV_ClientConnect_Pre(id)
 {
-	new iPlayers = get_playersnum_ex()
-
 	/* If connected players num is lower than 32, stop the function */
-	if(iPlayers != g_iMaxPlayers)
+	if(get_playersnum_ex() != g_iMaxPlayers)
 		return
 
 	new szPlayerData[Enum_PData], eArray[Enum_Data], bool:bFound, szTemp[MAX_INFO_STRING] 
