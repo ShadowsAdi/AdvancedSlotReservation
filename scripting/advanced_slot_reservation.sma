@@ -20,7 +20,7 @@
 #define MAX_USER_INFO_PASSWORD 32
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.2"
+#define VERSION "1.3"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[] 			= 			"name"
@@ -33,6 +33,7 @@ new const RELOAD_FILE[] 		=			"RELOAD_FILE_ACCESS"
 new const ADMIN_IMMUNITY_FLAG[] =			"ADMIN_IMMUNITY_FLAG"
 new const KICK_MESSAGE[]		=			"KICK_MESSAGE"
 new const USER_PASS_FIELD[]		=			"USERINFO_PASSWORD_FIELD"
+new const VGUI_SUPPORT[]		=			"VGUI_SUPPORT"
 
 enum _:Enum_Data
 {
@@ -69,12 +70,14 @@ enum _:Enum_Settings
 	iKickByPlayedTime,
 	szImmunityFlag[2],
 	szKickMessage[MAX_STRING],
-	szPassField[16]
+	szPassField[16],
+	bool:bVGUISupport
 }
 
 new Array:g_aReservedSlot
 new g_iMaxPlayers
 new g_szSettings[Enum_Settings]
+new g_iPointer
 
 public plugin_init()
 {
@@ -87,7 +90,7 @@ public plugin_init()
 		set_fail_state("ReHLDS API Not Found!")
 	}
 
-	RegisterHookChain(RH_SV_ConnectClient, "SV_ClientConnect_Pre")
+	RegisterHookChain(RH_SV_ConnectClient, "SV_ConnectClient_Pre")
 
 	g_aReservedSlot = ArrayCreate(Enum_Data)
 
@@ -101,8 +104,8 @@ public plugin_init()
 		SV_FindEmptySlot call: 			https://github.com/dreamstalker/rehlds/blob/master/rehlds/engine/sv_main.cpp#L2385-L2387
 		SV_FindEmptySlot function: 		https://github.com/dreamstalker/rehlds/blob/master/rehlds/engine/sv_main.cpp#L2236-L2259 
 	*/
-	
-	set_pcvar_num(get_cvar_pointer("sv_visiblemaxplayers"), g_iMaxPlayers + 1 /* We just need one more slot */)
+
+	g_iPointer = get_cvar_pointer("sv_visiblemaxplayers")
 }
 
 public plugin_cfg()
@@ -194,6 +197,10 @@ ReadFile()
 					{
 						copy(g_szSettings[szKickMessage], charsmax(g_szSettings[szKickMessage]), szTemp[szValue])
 					}
+					else if(equali(szTemp[szBuffer], VGUI_SUPPORT))
+					{
+						g_szSettings[bVGUISupport] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+					}
 				}
 				case iReservedSlots:
 				{
@@ -223,10 +230,14 @@ public plugin_end()
 	ArrayDestroy(g_aReservedSlot)
 }
 
-public SV_ClientConnect_Pre(id)
+public SV_ConnectClient_Pre()
 {
+	new iPNum = get_playersnum_ex(GetPlayers_IncludeConnecting)
+
+	set_visible_players((iPNum == g_iMaxPlayers - 1 && g_szSettings[bVGUISupport]) ? g_iMaxPlayers + 1 /* We just need one more slot */ : g_iMaxPlayers) 
+
 	/* If connected players num is lower than 32, stop the function */
-	if(get_playersnum_ex() != g_iMaxPlayers)
+	if(iPNum != g_iMaxPlayers)
 		return
 
 	new szPlayerData[Enum_PData], eArray[Enum_Data], bool:bFound, szTemp[MAX_INFO_STRING] 
@@ -403,4 +414,9 @@ bool:is_player_reserved(szPData[Enum_PData], szArray[Enum_Data])
 	}
 
 	return false
+}
+
+set_visible_players(iNum)
+{
+	set_pcvar_num(g_iPointer, iNum)
 }
