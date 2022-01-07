@@ -20,7 +20,7 @@
 #define MAX_USER_INFO_PASSWORD 32
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.3"
+#define VERSION "1.4"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[] 			= 			"name"
@@ -28,12 +28,13 @@ new const name_field[] 			= 			"name"
 new const INCLUDE_ADMINS[] 		=			"INCLUDE_ADMINS"
 new const INCLUDE_BOTS[] 		=			"INCLUDE_BOTS"
 new const KICK_SPECTATOR[]		=			"KICK_SPECTATOR"
-new const KICK_PLAYER_BY_PTIME[]=			"KICK_PLAYER_BY_PLAYTIME"
+new const KICK_PLAYER_BY_PTIME[]	=		"KICK_PLAYER_BY_PLAYTIME"
 new const RELOAD_FILE[] 		=			"RELOAD_FILE_ACCESS"
 new const ADMIN_IMMUNITY_FLAG[] =			"ADMIN_IMMUNITY_FLAG"
 new const KICK_MESSAGE[]		=			"KICK_MESSAGE"
 new const USER_PASS_FIELD[]		=			"USERINFO_PASSWORD_FIELD"
 new const VGUI_SUPPORT[]		=			"VGUI_SUPPORT"
+new const ADMIN_SUPPORT[]		=			"ADMIN_SUPPORT"
 
 enum _:Enum_Data
 {
@@ -71,7 +72,8 @@ enum _:Enum_Settings
 	szImmunityFlag[2],
 	szKickMessage[MAX_STRING],
 	szPassField[16],
-	bool:bVGUISupport
+	bool:bVGUISupport,
+	iAdminSupport
 }
 
 new Array:g_aReservedSlot
@@ -140,9 +142,11 @@ ReadFile()
 
 	ArrayClear(g_aReservedSlot)
 
+	new szTemp[Enum_Data]
+
 	if(iFile)
 	{
-		new szData[MAX_INFO_STRING], szTemp[Enum_Data], iSection
+		new szData[MAX_INFO_STRING], iSection
 
 		while(fgets(iFile, szData, charsmax(szData)))
 		{
@@ -201,6 +205,10 @@ ReadFile()
 					{
 						g_szSettings[bVGUISupport] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
 					}
+					else if(equali(szTemp[szBuffer], ADMIN_SUPPORT))
+					{
+						g_szSettings[iAdminSupport] = str_to_num(szTemp[szValue])
+					}
 				}
 				case iReservedSlots:
 				{
@@ -214,6 +222,43 @@ ReadFile()
 		}
 	}
 	fclose(iFile)
+
+	if(g_szSettings[iAdminSupport])
+	{
+		/* Flush data got from configuration file */
+		ArrayClear(g_aReservedSlot)
+
+		if(g_szSettings[iAdminSupport] == 2)
+		{
+			server_cmd("amx_reloadadmins") 
+			server_exec()
+		}
+
+		new iSize = admins_num(), iFlags, iAccess
+
+		for(new i; i < iSize; i++)
+		{
+			iFlags = admins_lookup(i, AdminProp_Flags)
+
+			iAccess = admins_lookup(i, AdminProp_Access)
+
+			/* Can't retrieve steamid from SV_ConnectClient Hook, just skip who has steamid as admin auth. 
+				If admin's access is not the same as the immunity flag, just skip him. */
+			if(iFlags & FLAG_AUTHID || !(iAccess & read_flags(g_szSettings[szImmunityFlag])))
+				continue
+
+			if(iFlags & FLAG_KICK)
+			{
+				set_player_data(AdminProp_Password, szTemp[szValue], charsmax(szTemp[szValue]), i, iFlags, szTemp[szBuffer], charsmax(szTemp[szBuffer]))
+			}
+			else
+			{
+				set_player_data(AdminProp_Auth, szTemp[szValue], charsmax(szTemp[szValue]), i, iFlags, szTemp[szBuffer], charsmax(szTemp[szBuffer]))
+			}
+
+			ArrayPushArray(g_aReservedSlot, szTemp)
+		}
+	}
 
 	static iCMD
 
@@ -234,7 +279,8 @@ public SV_ConnectClient_Pre()
 {
 	new iPNum = get_playersnum_ex(GetPlayers_IncludeConnecting)
 
-	set_visible_players((iPNum == g_iMaxPlayers - 1 && g_szSettings[bVGUISupport]) ? g_iMaxPlayers + 1 /* We just need one more slot */ : g_iMaxPlayers) 
+	/* Set max visible player slots if VGUI Support is enabled */
+	set_visible_players(iPNum) 
 
 	/* If connected players num is lower than 32, stop the function */
 	if(iPNum != g_iMaxPlayers)
@@ -261,8 +307,9 @@ public SV_ConnectClient_Pre()
 		/* iPosPassword shows the position in the userinfo for password and adding strlen() of g_szSettings[szPassField] */
 		copyc(szPlayerData[szPassword], charsmax(szPlayerData[szPassword]), szTemp[iPosPassword + strlen(g_szSettings[szPassField]) + 1], '\')
 	}
+	new iSize = ArraySize(g_aReservedSlot)
 
-	for(new i; i < ArraySize(g_aReservedSlot); i++)
+	for(new i; i < iSize; i++)
 	{
 		ArrayGetArray(g_aReservedSlot, i, eArray, charsmax(eArray))
 
@@ -387,7 +434,6 @@ public compare_playtime(iPlayer1, iPlayer2)
 bool:is_player_reserved(szPData[Enum_PData], szArray[Enum_Data])
 {
 	/* Searching for player's reserved data in array. If found, then the function can begin it's verification proccess */
-
 	switch(szArray[szValue][0])
 	{
 		case 'N':
@@ -416,7 +462,25 @@ bool:is_player_reserved(szPData[Enum_PData], szArray[Enum_Data])
 	return false
 }
 
+set_player_data(AdminProp:iAuthProp, szTemp[], iTempLen, iNum, iFlags, szAuth[], iAuthLen)
+{
+	if(iFlags & FLAG_KICK)
+	{
+		formatex(szTemp, iTempLen, "Password")
+	}
+	else if(iFlags & (FLAG_NOPASS | FLAG_TAG | FLAG_CASE_SENSITIVE))
+	{
+		formatex(szTemp, iTempLen, "Name")
+	}
+	else if(iFlags & FLAG_IP)
+	{
+		formatex(szTemp, iTempLen, "IP")
+	}
+
+	admins_lookup(iNum, iAuthProp, szAuth, iAuthLen)
+}
+
 set_visible_players(iNum)
 {
-	set_pcvar_num(g_iPointer, iNum)
+	set_pcvar_num(g_iPointer, iNum >= g_iMaxPlayers - 1 && g_szSettings[bVGUISupport] ? g_iMaxPlayers + 1 /* We just need one more slot */ : g_iMaxPlayers)
 }
