@@ -3,24 +3,10 @@
 #include <amxmodx>
 #include <amxmisc>
 #include <reapi>
-
-#if !defined MAX_NAME_LENGTH 
-#define MAX_NAME_LENGTH 32
-#endif
-
-#if !defined MAX_IP_LENGTH
-#define MAX_IP_LENGTH 16
-#endif
-
-/* Engine const https://github.com/dreamstalker/rehlds/blob/master/rehlds/engine/info.h#L37 */
-#define MAX_INFO_STRING 256
-
-#define MAX_STRING 256
-
-#define MAX_USER_INFO_PASSWORD 32
+#include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.4"
+#define VERSION "1.5"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[] 			= 			"name"
@@ -42,13 +28,6 @@ enum _:Enum_Data
 	szValue[MAX_STRING]
 }
 
-enum _:Enum_PData
-{
-	szIP[MAX_IP_LENGTH],
-	szName[MAX_NAME_LENGTH],
-	szPassword[MAX_USER_INFO_PASSWORD]
-}
-
 enum
 {
 	iSettings = 1,
@@ -60,6 +39,13 @@ enum
 	iNone = 0,
 	iMostPlayedTime,
 	iLesserPlayedTime
+}
+
+enum _:Enum_Forwards
+{
+	PlayerKickPre,
+	PlayerKickPost,
+	PlayerCheckPlayTime
 }
 
 enum _:Enum_Settings
@@ -81,6 +67,8 @@ new g_iMaxPlayers
 new g_szSettings[Enum_Settings]
 new g_iPointer
 
+new g_iForwards[Enum_Forwards], g_iForwardRet
+
 public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR)
@@ -98,6 +86,10 @@ public plugin_init()
 
 	g_iMaxPlayers = get_member_game(m_nMaxPlayers)
 
+	g_iForwards[PlayerKickPre] = CreateMultiForward("player_kick_pre", ET_STOP, FP_CELL, FP_ARRAY)
+	g_iForwards[PlayerKickPost] = CreateMultiForward("player_kick_post", ET_IGNORE, FP_CELL, FP_ARRAY)
+	g_iForwards[PlayerCheckPlayTime] = CreateMultiForward("player_check_playtime", ET_STOP, FP_ARRAY, FP_CELL)
+
 	/* Setting this cvar to let the player trigger SV_ConnectClient() function, followed by SV_ConnectClient_internal() function, finally checking if there is
 	any free player slot in SV_FindEmptySlot() function
 
@@ -108,6 +100,11 @@ public plugin_init()
 	*/
 
 	g_iPointer = get_cvar_pointer("sv_visiblemaxplayers")
+}
+
+public plugin_natives()
+{
+	register_library("advanced_slot_reservation")
 }
 
 public plugin_cfg()
@@ -225,13 +222,16 @@ ReadFile()
 
 	if(g_szSettings[iAdminSupport])
 	{
-		/* Flush data got from configuration file */
-		ArrayClear(g_aReservedSlot)
-
-		if(g_szSettings[iAdminSupport] == 2)
+		if(g_szSettings[iAdminSupport] >= 2)
 		{
 			server_cmd("amx_reloadadmins") 
 			server_exec()
+
+			if(g_szSettings[iAdminSupport] != 3)
+			{
+				/* Delete data got from configuration file */
+				ArrayClear(g_aReservedSlot)
+			}
 		}
 
 		new iSize = admins_num(), iFlags, iAccess
@@ -247,14 +247,7 @@ ReadFile()
 			if(iFlags & FLAG_AUTHID || !(iAccess & read_flags(g_szSettings[szImmunityFlag])))
 				continue
 
-			if(iFlags & FLAG_KICK)
-			{
-				set_player_data(AdminProp_Password, szTemp[szValue], charsmax(szTemp[szValue]), i, iFlags, szTemp[szBuffer], charsmax(szTemp[szBuffer]))
-			}
-			else
-			{
-				set_player_data(AdminProp_Auth, szTemp[szValue], charsmax(szTemp[szValue]), i, iFlags, szTemp[szBuffer], charsmax(szTemp[szBuffer]))
-			}
+			set_player_data((iFlags & FLAG_KICK) ? AdminProp_Password : AdminProp_Auth, szTemp[szValue], charsmax(szTemp[szValue]), i, iFlags, szTemp[szBuffer], charsmax(szTemp[szBuffer]))
 
 			ArrayPushArray(g_aReservedSlot, szTemp)
 		}
@@ -286,7 +279,7 @@ public SV_ConnectClient_Pre()
 	if(iPNum != g_iMaxPlayers)
 		return
 
-	new szPlayerData[Enum_PData], eArray[Enum_Data], bool:bFound, szTemp[MAX_INFO_STRING] 
+	new szPlayerData[PlayerData], eArray[Enum_Data], bool:bFound, szTemp[MAX_INFO_STRING] 
 	
 	/* Retrieving connecting player's IP address also his name to check them later... */
 	rh_get_net_from(szPlayerData[szIP], charsmax(szPlayerData[szIP]))
@@ -355,8 +348,17 @@ public SV_ConnectClient_Pre()
 			get_random_player(iRandomPlayer, iCount - 1)
 		}
 
+		new hArray = PrepareArray(szPlayerData, sizeof(szPlayerData))
+
+		ExecuteForward(g_iForwards[PlayerKickPre], g_iForwardRet, bChecked ? iRandomPlayer : iSelected[iRandomPlayer], hArray)
+
+		if(g_iForwardRet >= SLOT_KICK_YES)
+			return
+
 		if(!is_user_connected(bChecked ? iRandomPlayer : iSelected[iRandomPlayer]))
 			return
+
+		ExecuteForward(g_iForwards[PlayerKickPost], g_iForwardRet, bChecked ? iRandomPlayer : iSelected[iRandomPlayer], hArray)
 
 		rh_drop_client(bChecked ? iRandomPlayer : iSelected[iRandomPlayer], g_szSettings[szKickMessage])
 	}
@@ -402,6 +404,8 @@ get_player_by_playtime(iPlayers[MAX_PLAYERS], iCount, iCriteria)
 	new iTempID
 	SortCustom1D(iPlayers, iCount, "compare_playtime")
 
+	ExecuteForward(g_iForwards[PlayerCheckPlayTime], g_iForwardRet, PrepareArray(iPlayers, sizeof(iPlayers), 1), iCount)
+
 	switch(iCriteria)
 	{
 		case iMostPlayedTime:
@@ -431,9 +435,10 @@ public compare_playtime(iPlayer1, iPlayer2)
 	return 0
 }
 
-bool:is_player_reserved(szPData[Enum_PData], szArray[Enum_Data])
+bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 {
 	/* Searching for player's reserved data in array. If found, then the function can begin it's verification proccess */
+
 	switch(szArray[szValue][0])
 	{
 		case 'N':
