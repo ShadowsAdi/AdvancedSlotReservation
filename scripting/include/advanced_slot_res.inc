@@ -1,9 +1,9 @@
 /* Sublime AMXX Editor v4.2 */
 
-#if defined _advanced_slot_reservation_included
+#if defined _adv_slot_reservation_included
 	#endinput
 #endif
-#define _advanced_slot_reservation_included
+#define _adv_slot_reservation_included
 
 #if !defined MAX_NAME_LENGTH 
 #define MAX_NAME_LENGTH 32
@@ -11,6 +11,10 @@
 
 #if !defined MAX_IP_LENGTH
 #define MAX_IP_LENGTH 16
+#endif
+
+#if !defined MAX_PLAYERS
+#define MAX_PLAYERS 32
 #endif
 
 /* Engine const https://github.com/dreamstalker/rehlds/blob/master/rehlds/engine/info.h#L37 */
@@ -65,3 +69,34 @@ forward player_kick_post(id, szPlayerData[PlayerData]);
  * @return					Forward ignores return values.
  */
 forward player_check_playtime(szPlayers[MAX_PLAYERS], iTotalPlayers);
+
+/* Support for AmxModX versions lower that 1.8.3 */
+#if AMXX_VERSION_NUM < 183
+enum GetPlayersFlags (<<= 1)
+{
+    GetPlayers_None = 0,           // No filter (Default)
+    GetPlayers_ExcludeDead = 1,    // Do not include dead clients
+    GetPlayers_ExcludeAlive,       // Do not include alive clients
+    GetPlayers_ExcludeBots,        // Do not include bots
+    GetPlayers_ExcludeHuman,       // Do not include human clients
+    GetPlayers_MatchTeam,          // Match with team
+    GetPlayers_MatchNameSubstring, // Match with part of name
+    GetPlayers_CaseInsensitive,    // Match case insensitive
+    GetPlayers_ExcludeHLTV,        // Do not include HLTV proxies
+    GetPlayers_IncludeConnecting   // Include connecting clients
+};
+
+stock get_players_ex(players[MAX_PLAYERS] = {}, &num, GetPlayersFlags:flags = GetPlayers_None, const team[] = "")
+{
+    new strFlags[10];
+    get_flags(_:flags, strFlags, charsmax(strFlags));
+    get_players(players, num, strFlags, team);
+}
+
+stock get_playersnum_ex(GetPlayersFlags:flags = GetPlayers_None, const team[] = "")
+{
+    new PlayersNum;
+    get_players_ex(_, PlayersNum, flags, team);
+    return PlayersNum;
+}
+#endif

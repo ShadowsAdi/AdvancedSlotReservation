@@ -104,7 +104,7 @@ public plugin_init()
 
 public plugin_natives()
 {
-	register_library("advanced_slot_reservation")
+	register_library("adv_slot_reservation")
 }
 
 public plugin_cfg()
@@ -280,7 +280,7 @@ public SV_ConnectClient_Pre()
 		return
 
 	new szPlayerData[PlayerData], eArray[Enum_Data], bool:bFound, szTemp[MAX_INFO_STRING] 
-	
+
 	/* Retrieving connecting player's IP address also his name to check them later... */
 	rh_get_net_from(szPlayerData[szIP], charsmax(szPlayerData[szIP]))
 
@@ -304,7 +304,11 @@ public SV_ConnectClient_Pre()
 
 	for(new i; i < iSize; i++)
 	{
+		#if AMXX_VERSION_NUM < 183
+		ArrayGetArray(g_aReservedSlot, i, eArray)
+		#else
 		ArrayGetArray(g_aReservedSlot, i, eArray, charsmax(eArray))
+		#endif
 
 		if(is_player_reserved(szPlayerData, eArray))
 		{
