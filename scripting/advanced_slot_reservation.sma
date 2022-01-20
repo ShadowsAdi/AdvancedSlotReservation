@@ -6,7 +6,7 @@
 #include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.5"
+#define VERSION "1.6"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[] 			= 			"name"
