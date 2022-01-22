@@ -72,7 +72,7 @@ jobs:
       - name: Download AMX Mod X Base Files
         run: |
           wget "https://www.amxmodx.org/latest.php?version=$AMXX_VERSION&os=linux&package=base" -O amxmodx-base-linux.tar.gz
-          tar -zxvf amxmodx-base-linux.tar.gz
+          tar xf amxmodx-base-linux.tar.gz
       - name: Download AMX Mod X Mod Files
         if: ${{ env.AMXX_MOD_PACKAGE }}
         run: |
