@@ -56,7 +56,6 @@ jobs:
           name: plugin_binaries_190
           path: ${{ env.ARTIFACTS_DIR }}/*
 
-jobs:
   compile_plugin_19:
     runs-on: ubuntu-latest
     env:
