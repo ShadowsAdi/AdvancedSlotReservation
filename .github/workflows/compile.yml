@@ -71,13 +71,13 @@ jobs:
     
       - name: Download AMX Mod X Base Files
         run: |
-          wget "https://www.amxmodx.org/latest.php?version=$AMXX_VERSION&os=linux&package=base" -O amxmodx-base-linux.tar.gz
-          tar xf amxmodx-base-linux.tar.gz
+          wget "https://www.amxmodx.org/amxxdrop/$AMXX_VERSION/amxmodx-1.8.2-hg65-base-linux.tar.gz" -O amxmodx18-base-linux.tar.gz
+          tar xf amxmodx18-base-linux.tar.gz
       - name: Download AMX Mod X Mod Files
         if: ${{ env.AMXX_MOD_PACKAGE }}
         run: |
-          wget "  https://www.amxmodx.org/amxxdrop/$AMXX_VERSION/amxmodx-1.8.2-hg65-base-linux.tar.gz" -O "amxmodx18-$AMXX_MOD_PACKAGE-linux.tar.gz"
-          tar -zxvf "amxmodx18-$AMXX_MOD_PACKAGE-linux.tar.gz"
+          wget "https://www.amxmodx.org/amxxdrop/$AMXX_VERSION/amxmodx-1.8.2-hg65-base-linux.tar.gz" -O "amxmodx18-$AMXX_MOD_PACKAGE-linux.tar.gz"
+          tar xf "amxmodx18-$AMXX_MOD_PACKAGE-linux.tar.gz"
       - name: Download ReAPI Files
         run: |
           wget https://github.com/s1lentq/reapi/releases/download/5.21.0.248/reapi-bin-5.21.0.248.zip
