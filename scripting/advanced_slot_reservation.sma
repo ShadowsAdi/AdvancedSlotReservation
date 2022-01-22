@@ -6,7 +6,7 @@
 #include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.6"
+#define VERSION "1.7"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[] 			= 			"name"
@@ -108,6 +108,12 @@ public plugin_natives()
 }
 
 public plugin_cfg()
+{
+	/* This should fix dynamic admin storage support for SQL versions */
+	set_task(1.0, "task_delayed_plugin_cfg")
+}
+
+public task_delayed_plugin_cfg()
 {
 	ReadFile()
 }
