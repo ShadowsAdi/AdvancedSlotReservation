@@ -56,7 +56,7 @@ jobs:
           name: plugin_binaries_190
           path: ${{ env.ARTIFACTS_DIR }}/*
 
-  compile_plugin_19:
+  compile_plugin_18:
     runs-on: ubuntu-latest
     env:
       AMXX_MOD_PACKAGE: ""
