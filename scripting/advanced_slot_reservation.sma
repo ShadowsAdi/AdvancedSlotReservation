@@ -6,12 +6,8 @@
 #include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.8"
+#define VERSION "1.9"
 #define AUTHOR  "Shadows Adi"
-
-#if !defined client_disconnected
-#define client_disconnected client_disconnect
-#endif
 
 new const name_field[]           =          "name"
 
@@ -284,15 +280,12 @@ public plugin_end()
 	ArrayDestroy(g_aReservedSlot)
 }
 
-public client_disconnected(id)
-{
-	set_visible_players()
-}
-
 public SV_ConnectClient_Pre()
 {
+	new iPNum = get_playersnum_ex(GetPlayers_IncludeConnecting)
+
 	/* Set max visible player slots if VGUI Support is enabled */
-	new iPNum = set_visible_players() 
+	set_visible_players(iPNum)
 
 	/* If connected players num is lower than 32, stop the function */
 	if(iPNum != g_iMaxPlayers)
@@ -474,32 +467,33 @@ bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 	{
 		case 'N':
 		{
-			if(equali(szPData[szName], szArray[szBuffer], charsmax(szPData[szName])))
+			if(equali(szPData[szName], szArray[szBuffer], strlen(szPData[szName])))
 			{
 				return true
 			}
 		}
 		case 'P':
 		{
-			if(g_szSettings[iHashSupport] >= 0)
+			static sTemp[34]
+			sTemp = szPData[szPassword]
+			if(g_szSettings[iHashSupport] >= 0 && (0 < g_szSettings[iAdminSupport] < 3))
 			{
 				#if AMXX_VERSION_NUM < 183
-				new sTemp[34]
 				md5(szPData[szPassword], sTemp)
 				copy(szPData[szPassword], charsmax(szPData[szPassword]), sTemp)
 				#else
-				hash_string(szPData[szPassword], HashType:g_szSettings[iHashSupport], szPData[szPassword], charsmax(szPData[szPassword]))
+				hash_string(szPData[szPassword], HashType:g_szSettings[iHashSupport], sTemp, charsmax(sTemp))
 				#endif
 			}
 			
-			if(equali(szPData[szPassword], szArray[szBuffer], strlen(szPData[szPassword])))
+			if(equali(sTemp, szArray[szBuffer], strlen(szPData[szPassword])))
 			{
 				return true
 			}
 		}
 		case 'I':
 		{
-			if(equali(szPData[szIP], szArray[szBuffer], charsmax(szPData[szIP])))
+			if(equali(szPData[szIP], szArray[szBuffer], strlen(szPData[szIP])))
 			{
 				return true
 			}
@@ -527,11 +521,7 @@ set_player_data(AdminProp:iAuthProp, szTemp[], iTempLen, iNum, iFlags, szAuth[],
 	admins_lookup(iNum, iAuthProp, szAuth, iAuthLen)
 }
 
-set_visible_players()
+set_visible_players(iNum)
 {
-	new iNum = get_playersnum_ex(GetPlayers_IncludeConnecting)
-
 	set_pcvar_num(g_iPointer, iNum >= g_iMaxPlayers - 1 && g_szSettings[bVGUISupport] ? g_iMaxPlayers + 1 /* We just need one more slot */ : g_iMaxPlayers)
-
-	return iNum
 }
