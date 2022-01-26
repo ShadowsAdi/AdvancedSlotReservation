@@ -6,25 +6,30 @@
 #include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.7"
+#define VERSION "1.8"
 #define AUTHOR  "Shadows Adi"
 
-new const name_field[] 			= 			"name"
+#if !defined client_disconnected
+#define client_disconnected client_disconnect
+#endif
 
-new const INCLUDE_ADMINS[] 		=			"INCLUDE_ADMINS"
-new const INCLUDE_BOTS[] 		=			"INCLUDE_BOTS"
-new const KICK_SPECTATOR[]		=			"KICK_SPECTATOR"
-new const KICK_PLAYER_BY_PTIME[]	=		"KICK_PLAYER_BY_PLAYTIME"
-new const RELOAD_FILE[] 		=			"RELOAD_FILE_ACCESS"
-new const ADMIN_IMMUNITY_FLAG[] =			"ADMIN_IMMUNITY_FLAG"
-new const KICK_MESSAGE[]		=			"KICK_MESSAGE"
-new const USER_PASS_FIELD[]		=			"USERINFO_PASSWORD_FIELD"
-new const VGUI_SUPPORT[]		=			"VGUI_SUPPORT"
-new const ADMIN_SUPPORT[]		=			"ADMIN_SUPPORT"
+new const name_field[]           =          "name"
+
+new const INCLUDE_ADMINS[]       =          "INCLUDE_ADMINS"
+new const INCLUDE_BOTS[]         =          "INCLUDE_BOTS"
+new const KICK_SPECTATOR[]       =          "KICK_SPECTATOR"
+new const KICK_PLAYER_BY_PTIME[] =          "KICK_PLAYER_BY_PLAYTIME"
+new const RELOAD_FILE[]          =          "RELOAD_FILE_ACCESS"
+new const ADMIN_IMMUNITY_FLAG[]  =          "ADMIN_IMMUNITY_FLAG"
+new const KICK_MESSAGE[]         =          "KICK_MESSAGE"
+new const USER_PASS_FIELD[]      =          "USERINFO_PASSWORD_FIELD"
+new const VGUI_SUPPORT[]         =          "VGUI_SUPPORT"
+new const ADMIN_SUPPORT[]        =          "ADMIN_SUPPORT"
+new const HASHING_SUPPORT[]      =          "HASHING_SUPPORT"
 
 enum _:Enum_Data
 {
-	szBuffer[MAX_NAME_LENGTH],
+	szBuffer[MAX_NAME_LENGTH + 1],
 	szValue[MAX_STRING]
 }
 
@@ -59,7 +64,8 @@ enum _:Enum_Settings
 	szKickMessage[MAX_STRING],
 	szPassField[16],
 	bool:bVGUISupport,
-	iAdminSupport
+	iAdminSupport,
+	iHashSupport
 }
 
 new Array:g_aReservedSlot
@@ -109,7 +115,7 @@ public plugin_natives()
 
 public plugin_cfg()
 {
-	/* This should fix dynamic admin storage support for SQL versions */
+	/* This should fix dynamic admin storage support for SQL versions, if your dynamic admins are not loaded, reload the file using the command. */
 	set_task(1.0, "task_delayed_plugin_cfg")
 }
 
@@ -147,80 +153,84 @@ ReadFile()
 
 	new szTemp[Enum_Data]
 
-	if(iFile)
+	if(!iFile)
+		return 0
+
+	new szData[MAX_INFO_STRING], iSection
+
+	while(fgets(iFile, szData, charsmax(szData)))
 	{
-		new szData[MAX_INFO_STRING], iSection
+		trim(szData)
 
-		while(fgets(iFile, szData, charsmax(szData)))
+		if(szData[0] == '#' || szData[0] == EOS || szData[0] == ';')
+			continue
+
+		if(szData[0] == '[')
 		{
-			trim(szData)
+			iSection += 1
+			continue
+		}
 
-			if(szData[0] == '#' || szData[0] == EOS || szData[0] == ';')
-				continue
-
-			if(szData[0] == '[')
+		switch(iSection)
+		{
+			case iSettings:
 			{
-				iSection += 1
-				continue
+				strtok(szData, szTemp[szBuffer], charsmax(szTemp[szBuffer]), szTemp[szValue], charsmax(szTemp[szValue]), '=')
+				trim(szTemp[szBuffer])
+				trim(szTemp[szValue])
+
+				if(equali(szTemp[szBuffer], INCLUDE_ADMINS))
+				{
+					g_szSettings[bIncludeAdmins] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+				}
+				else if(equali(szTemp[szBuffer], INCLUDE_BOTS))
+				{
+					g_szSettings[bIncludeBots] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+				}
+				else if(equali(szTemp[szBuffer], KICK_SPECTATOR))
+				{
+					g_szSettings[bKickSpectator] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+				}
+				else if(equali(szTemp[szBuffer], KICK_PLAYER_BY_PTIME))
+				{
+					g_szSettings[iKickByPlayedTime] = clamp(str_to_num(szTemp[szValue]), 0, 2)
+				}
+				else if(equali(szTemp[szBuffer], RELOAD_FILE))
+				{
+					copy(g_szSettings[szAccess], charsmax(g_szSettings[szAccess]), szTemp[szValue])
+				}
+				else if(equali(szTemp[szBuffer], ADMIN_IMMUNITY_FLAG))
+				{
+					copy(g_szSettings[szImmunityFlag], charsmax(g_szSettings[szImmunityFlag]), szTemp[szValue])
+				}
+				else if(equali(szTemp[szBuffer], USER_PASS_FIELD))
+				{
+					copy(g_szSettings[szPassField], charsmax(g_szSettings[szPassField]), szTemp[szValue])
+				}
+				else if(equali(szTemp[szBuffer], KICK_MESSAGE))
+				{
+					copy(g_szSettings[szKickMessage], charsmax(g_szSettings[szKickMessage]), szTemp[szValue])
+				}
+				else if(equali(szTemp[szBuffer], VGUI_SUPPORT))
+				{
+					g_szSettings[bVGUISupport] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
+				}
+				else if(equali(szTemp[szBuffer], ADMIN_SUPPORT))
+				{
+					g_szSettings[iAdminSupport] = str_to_num(szTemp[szValue])
+				}
+				else if(equali(szTemp[szBuffer], HASHING_SUPPORT))
+				{
+					g_szSettings[iHashSupport] = clamp(str_to_num(szTemp[szValue]), -1, 11)
+				}
 			}
-
-			switch(iSection)
+			case iReservedSlots:
 			{
-				case iSettings:
-				{
-					strtok(szData, szTemp[szBuffer], charsmax(szTemp[szBuffer]), szTemp[szValue], charsmax(szTemp[szValue]), '=')
-					trim(szTemp[szBuffer])
-					trim(szTemp[szValue])
+				parse(szData, szTemp[szBuffer], charsmax(szTemp[szBuffer]), szTemp[szValue], charsmax(szTemp[szValue]))
 
-					if(equali(szTemp[szBuffer], INCLUDE_ADMINS))
-					{
-						g_szSettings[bIncludeAdmins] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
-					}
-					else if(equali(szTemp[szBuffer], INCLUDE_BOTS))
-					{
-						g_szSettings[bIncludeBots] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
-					}
-					else if(equali(szTemp[szBuffer], KICK_SPECTATOR))
-					{
-						g_szSettings[bKickSpectator] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
-					}
-					else if(equali(szTemp[szBuffer], KICK_PLAYER_BY_PTIME))
-					{
-						g_szSettings[iKickByPlayedTime] = clamp(str_to_num(szTemp[szValue]), 0, 2)
-					}
-					else if(equali(szTemp[szBuffer], RELOAD_FILE))
-					{
-						copy(g_szSettings[szAccess], charsmax(g_szSettings[szAccess]), szTemp[szValue])
-					}
-					else if(equali(szTemp[szBuffer], ADMIN_IMMUNITY_FLAG))
-					{
-						copy(g_szSettings[szImmunityFlag], charsmax(g_szSettings[szImmunityFlag]), szTemp[szValue])
-					}
-					else if(equali(szTemp[szBuffer], USER_PASS_FIELD))
-					{
-						copy(g_szSettings[szPassField], charsmax(g_szSettings[szPassField]), szTemp[szValue])
-					}
-					else if(equali(szTemp[szBuffer], KICK_MESSAGE))
-					{
-						copy(g_szSettings[szKickMessage], charsmax(g_szSettings[szKickMessage]), szTemp[szValue])
-					}
-					else if(equali(szTemp[szBuffer], VGUI_SUPPORT))
-					{
-						g_szSettings[bVGUISupport] = bool:clamp(str_to_num(szTemp[szValue]), 0, 1)
-					}
-					else if(equali(szTemp[szBuffer], ADMIN_SUPPORT))
-					{
-						g_szSettings[iAdminSupport] = str_to_num(szTemp[szValue])
-					}
-				}
-				case iReservedSlots:
-				{
-					parse(szData, szTemp[szBuffer], charsmax(szTemp[szBuffer]), szTemp[szValue], charsmax(szTemp[szValue]))
+				replace_all(szTemp[szBuffer], charsmax(szTemp[szBuffer]), ":", "")
 
-					replace_all(szTemp[szBuffer], charsmax(szTemp[szBuffer]), ":", "")
-
-					ArrayPushArray(g_aReservedSlot, szTemp)
-				}
+				ArrayPushArray(g_aReservedSlot, szTemp)
 			}
 		}
 	}
@@ -274,12 +284,15 @@ public plugin_end()
 	ArrayDestroy(g_aReservedSlot)
 }
 
+public client_disconnected(id)
+{
+	set_visible_players()
+}
+
 public SV_ConnectClient_Pre()
 {
-	new iPNum = get_playersnum_ex(GetPlayers_IncludeConnecting)
-
 	/* Set max visible player slots if VGUI Support is enabled */
-	set_visible_players(iPNum) 
+	new iPNum = set_visible_players() 
 
 	/* If connected players num is lower than 32, stop the function */
 	if(iPNum != g_iMaxPlayers)
@@ -306,6 +319,7 @@ public SV_ConnectClient_Pre()
 		/* iPosPassword shows the position in the userinfo for password and adding strlen() of g_szSettings[szPassField] */
 		copyc(szPlayerData[szPassword], charsmax(szPlayerData[szPassword]), szTemp[iPosPassword + strlen(g_szSettings[szPassField]) + 1], '\')
 	}
+
 	new iSize = ArraySize(g_aReservedSlot)
 
 	for(new i; i < iSize; i++)
@@ -325,21 +339,12 @@ public SV_ConnectClient_Pre()
 
 	if(bFound)
 	{
-		new iPlayers[MAX_PLAYERS], iSelected[MAX_PLAYERS], iNum, iPlayer, iCount, bool:bInclude[2]
-		get_players_filtered(iPlayers, iNum)
+		new iSelected[MAX_PLAYERS], iCount
 
-		bInclude[0] = g_szSettings[bIncludeAdmins]
-		bInclude[1] = g_szSettings[bIncludeBots]
-
-		for(new i; i < iNum; i++)
+		if(!get_players_filtered(iSelected, iCount))
 		{
-			iPlayer = iPlayers[i]
-
-			if(!bInclude[0] && has_flag(iPlayer, g_szSettings[szImmunityFlag]) || !bInclude[1] && is_user_bot_hltv(iPlayer))
-				continue
-
-			iSelected[iCount] = iPlayer
-			iCount++
+			log_to_file("advanced_slot_reservation.log", "Something strange just happened, couldn't sort the players list!")
+			return
 		}
 
 		new iRandomPlayer = -1, bool:bChecked
@@ -353,24 +358,23 @@ public SV_ConnectClient_Pre()
 			}
 		}
 
-		if(iRandomPlayer == -1)
+		if(!iRandomPlayer)
 		{
-			get_random_player(iRandomPlayer, iCount - 1)
+			bChecked = false
+			get_random_player(iRandomPlayer, iCount - 1)		
 		}
 
 		new hArray = PrepareArray(szPlayerData, sizeof(szPlayerData))
+		new iTempID = bChecked ? iRandomPlayer : iSelected[iRandomPlayer]
 
-		ExecuteForward(g_iForwards[PlayerKickPre], g_iForwardRet, bChecked ? iRandomPlayer : iSelected[iRandomPlayer], hArray)
+		ExecuteForward(g_iForwards[PlayerKickPre], g_iForwardRet, iTempID, hArray)
 
 		if(g_iForwardRet >= SLOT_KICK_YES)
 			return
 
-		if(!is_user_connected(bChecked ? iRandomPlayer : iSelected[iRandomPlayer]))
-			return
+		ExecuteForward(g_iForwards[PlayerKickPost], g_iForwardRet, iTempID, hArray)
 
-		ExecuteForward(g_iForwards[PlayerKickPost], g_iForwardRet, bChecked ? iRandomPlayer : iSelected[iRandomPlayer], hArray)
-
-		rh_drop_client(bChecked ? iRandomPlayer : iSelected[iRandomPlayer], g_szSettings[szKickMessage])
+		rh_drop_client(iTempID, g_szSettings[szKickMessage])
 	}
 }
 
@@ -382,20 +386,38 @@ bool:is_user_bot_hltv(id)
 	return false
 }
 
-bool:get_players_filtered(iPlayers[MAX_PLAYERS], &iNum)
+bool:get_players_filtered(iPlayerArray[MAX_PLAYERS], &iNum)
 {
-	new bool:bCustomFilter
+	new bool:bCustomFilter, iIterator, bool:bInclude[2], iPlayer, iPlayers[MAX_PLAYERS]
 
 	if(g_szSettings[bKickSpectator])
 		bCustomFilter = true
 
-	recount:
-	get_players(iPlayers, iNum, bCustomFilter ? "e" : "", bCustomFilter ? "SPECTATOR" : "")
+	bInclude[0] = g_szSettings[bIncludeAdmins]
+	bInclude[1] = g_szSettings[bIncludeBots]
 
-	if(!iNum && g_szSettings[bKickSpectator])
+	recount:
+	get_players(iPlayers, iIterator, bCustomFilter ? "e" : "", bCustomFilter ? "SPECTATOR" : "")
+
+	for(new i; i < iIterator; i++)
 	{
-		bCustomFilter = false
-		goto recount
+		iPlayer = iPlayers[i]
+
+		if(!bInclude[0] && has_flag(iPlayer, g_szSettings[szImmunityFlag]) || !bInclude[1] && is_user_bot_hltv(iPlayer) || !is_user_connected(iPlayer))
+			continue
+
+		iPlayerArray[iNum] = iPlayer
+		iNum++
+	}
+
+	if(!iNum)
+	{
+		if(g_szSettings[bKickSpectator])
+		{
+			bCustomFilter = false
+			goto recount
+		}
+		return false
 	}
 
 	return true
@@ -448,7 +470,6 @@ public compare_playtime(iPlayer1, iPlayer2)
 bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 {
 	/* Searching for player's reserved data in array. If found, then the function can begin it's verification proccess */
-
 	switch(szArray[szValue][0])
 	{
 		case 'N':
@@ -460,7 +481,18 @@ bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 		}
 		case 'P':
 		{
-			if(equali(szPData[szPassword], szArray[szBuffer], charsmax(szPData[szPassword])))
+			if(g_szSettings[iHashSupport] >= 0)
+			{
+				#if AMXX_VERSION_NUM < 183
+				new sTemp[34]
+				md5(szPData[szPassword], sTemp)
+				copy(szPData[szPassword], charsmax(szPData[szPassword]), sTemp)
+				#else
+				hash_string(szPData[szPassword], HashType:g_szSettings[iHashSupport], szPData[szPassword], charsmax(szPData[szPassword]))
+				#endif
+			}
+			
+			if(equali(szPData[szPassword], szArray[szBuffer], strlen(szPData[szPassword])))
 			{
 				return true
 			}
@@ -495,7 +527,11 @@ set_player_data(AdminProp:iAuthProp, szTemp[], iTempLen, iNum, iFlags, szAuth[],
 	admins_lookup(iNum, iAuthProp, szAuth, iAuthLen)
 }
 
-set_visible_players(iNum)
+set_visible_players()
 {
+	new iNum = get_playersnum_ex(GetPlayers_IncludeConnecting)
+
 	set_pcvar_num(g_iPointer, iNum >= g_iMaxPlayers - 1 && g_szSettings[bVGUISupport] ? g_iMaxPlayers + 1 /* We just need one more slot */ : g_iMaxPlayers)
+
+	return iNum
 }

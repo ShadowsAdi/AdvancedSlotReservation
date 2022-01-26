@@ -22,7 +22,7 @@
 
 #define MAX_STRING 256
 
-#define MAX_USER_INFO_PASSWORD 32
+#define MAX_USER_INFO_PASSWORD 34
 
 /* Custom return values */
 enum (+=250)
