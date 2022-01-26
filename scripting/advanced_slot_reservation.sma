@@ -486,7 +486,7 @@ bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 				#endif
 			}
 			
-			if(equali(sTemp, szArray[szBuffer], strlen(szPData[szPassword])))
+			if(equali(sTemp, szArray[szBuffer], strlen(sTemp)))
 			{
 				return true
 			}
