@@ -6,7 +6,7 @@
 #include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "1.9"
+#define VERSION "2.0"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[]           =          "name"
@@ -351,7 +351,7 @@ public SV_ConnectClient_Pre()
 			}
 		}
 
-		if(!iRandomPlayer)
+		if(iRandomPlayer <= 0)
 		{
 			bChecked = false
 			get_random_player(iRandomPlayer, iCount - 1)		
