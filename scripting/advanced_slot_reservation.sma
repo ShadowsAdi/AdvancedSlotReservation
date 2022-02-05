@@ -6,7 +6,7 @@
 #include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "2.0"
+#define VERSION "2.1"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[]           =          "name"
@@ -296,6 +296,13 @@ public SV_ConnectClient_Pre()
 	/* Retrieving connecting player's IP address also his name to check them later... */
 	rh_get_net_from(szPlayerData[szIP], charsmax(szPlayerData[szIP]))
 
+	new iPos = contain(szPlayerData[szIP], ":")
+
+	if(iPos != -1) 
+	{
+		szPlayerData[szIP][iPos] = EOS
+	}
+
 	/* Fourth agrument is always userinfo */
 	read_argv(4, szTemp, charsmax(szTemp))
 
@@ -475,12 +482,11 @@ bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 		case 'P':
 		{
 			static sTemp[34]
-			sTemp = szPData[szPassword]
+			copy(sTemp, charsmax(sTemp), szPData[szPassword])
 			if(g_szSettings[iHashSupport] >= 0 && (0 < g_szSettings[iAdminSupport] < 3))
 			{
 				#if AMXX_VERSION_NUM < 183
 				md5(szPData[szPassword], sTemp)
-				copy(szPData[szPassword], charsmax(szPData[szPassword]), sTemp)
 				#else
 				hash_string(szPData[szPassword], HashType:g_szSettings[iHashSupport], sTemp, charsmax(sTemp))
 				#endif
