@@ -33,7 +33,9 @@ enum (+=250)
 
 enum _:PlayerData
 {
+    #if defined USE_REAPI
 	szIP[MAX_IP_LENGTH],
+    #endif
 	szName[MAX_NAME_LENGTH],
 	szPassword[MAX_USER_INFO_PASSWORD]
 };

@@ -1,12 +1,21 @@
 /* Sublime AMXX Editor v4.2 */
 
+/* 	Uncomment this line to use reAPI Support.
+	NOTE! Only reAPI can use reservation of the IP address! 
+*/
+//#define USE_REAPI
+
 #include <amxmodx>
 #include <amxmisc>
+#if defined USE_REAPI
 #include <reapi>
+#else
+#include <orpheu>
+#endif
 #include <advanced_slot_res>
 
 #define PLUGIN  "[Advanced Slot Reservation]"
-#define VERSION "2.1"
+#define VERSION "2.2"
 #define AUTHOR  "Shadows Adi"
 
 new const name_field[]           =          "name"
@@ -77,16 +86,24 @@ public plugin_init()
 
 	register_cvar("adv_slot_reservation", AUTHOR, FCVAR_SERVER|FCVAR_EXTDLL|FCVAR_UNLOGGED|FCVAR_SPONLY)
 
+	#if defined USE_REAPI
+
 	if(!is_rehlds())
 	{
 		set_fail_state("ReHLDS API Not Found!")
 	}
 
-	RegisterHookChain(RH_SV_ConnectClient, "SV_ConnectClient_Pre")
-
-	g_aReservedSlot = ArrayCreate(Enum_Data)
+	RegisterHookChain(RH_SV_ConnectClient, "SV_ConnectClient_Pre", 0)
 
 	g_iMaxPlayers = get_member_game(m_nMaxPlayers)
+	#else
+
+	OrpheuRegisterHook(OrpheuGetFunction("SV_ConnectClient"), "SV_ConnectClient_Pre", OrpheuHookPre)
+
+	g_iMaxPlayers = get_maxplayers()
+	#endif
+
+	g_aReservedSlot = ArrayCreate(Enum_Data)
 
 	g_iForwards[PlayerKickPre] = CreateMultiForward("player_kick_pre", ET_STOP, FP_CELL, FP_ARRAY)
 	g_iForwards[PlayerKickPost] = CreateMultiForward("player_kick_post", ET_IGNORE, FP_CELL, FP_ARRAY)
@@ -256,7 +273,11 @@ ReadFile()
 
 			/* Can't retrieve steamid from SV_ConnectClient Hook, just skip who has steamid as admin auth. 
 				If admin's access is not the same as the immunity flag, just skip him. */
+			#if defined USE_REAPI
 			if(iFlags & FLAG_AUTHID || !(iAccess & read_flags(g_szSettings[szImmunityFlag])))
+			#else
+			if(iFlags & FLAG_AUTHID || iFlags & FLAG_IP || !(iAccess & read_flags(g_szSettings[szImmunityFlag])))
+			#endif
 				continue
 
 			set_player_data((iFlags & FLAG_KICK) ? AdminProp_Password : AdminProp_Auth, szTemp[szValue], charsmax(szTemp[szValue]), i, iFlags, szTemp[szBuffer], charsmax(szTemp[szBuffer]))
@@ -293,6 +314,7 @@ public SV_ConnectClient_Pre()
 
 	new szPlayerData[PlayerData], eArray[Enum_Data], bool:bFound, szTemp[MAX_INFO_STRING] 
 
+	#if defined USE_REAPI
 	/* Retrieving connecting player's IP address also his name to check them later... */
 	rh_get_net_from(szPlayerData[szIP], charsmax(szPlayerData[szIP]))
 
@@ -302,6 +324,7 @@ public SV_ConnectClient_Pre()
 	{
 		szPlayerData[szIP][iPos] = EOS
 	}
+	#endif
 
 	/* Fourth agrument is always userinfo */
 	read_argv(4, szTemp, charsmax(szTemp))
@@ -374,7 +397,11 @@ public SV_ConnectClient_Pre()
 
 		ExecuteForward(g_iForwards[PlayerKickPost], g_iForwardRet, iTempID, hArray)
 
+		#if defined USE_REAPI
 		rh_drop_client(iTempID, g_szSettings[szKickMessage])
+		#else
+		server_cmd("kick #%d ^"%s^"", get_user_userid(iTempID), g_szSettings[szKickMessage])
+		#endif
 	}
 }
 
@@ -497,6 +524,7 @@ bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 				return true
 			}
 		}
+		#if defined USE_REAPI
 		case 'I':
 		{
 			if(equali(szPData[szIP], szArray[szBuffer], strlen(szPData[szIP])))
@@ -504,6 +532,7 @@ bool:is_player_reserved(szPData[PlayerData], szArray[Enum_Data])
 				return true
 			}
 		}
+		#endif
 	}
 
 	return false
@@ -519,10 +548,12 @@ set_player_data(AdminProp:iAuthProp, szTemp[], iTempLen, iNum, iFlags, szAuth[],
 	{
 		formatex(szTemp, iTempLen, "Name")
 	}
+	#if defined USE_REAPI
 	else if(iFlags & FLAG_IP)
 	{
 		formatex(szTemp, iTempLen, "IP")
 	}
+	#endif
 
 	admins_lookup(iNum, iAuthProp, szAuth, iAuthLen)
 }
