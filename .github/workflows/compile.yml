@@ -45,11 +45,10 @@ jobs:
           
           # Compile all plugins inside scripting folder
           # List of files to compile generated from the original checked out files
-          for file in $GITHUB_WORKSPACE/scripting/advanced_slot_reservation.sma
-          do
-            amxfile="`echo $file | sed -e 's/\.sma$/\.amxx/'`"
-            echo -e "\nCompiling $(basename $file)..."
-            ./amxxpc $(basename $file) -o$ARTIFACTS_DIR/$(basename "$amxfile")
+          file = $GITHUB_WORKSPACE/scripting/advanced_slot_reservation.sma
+          amxfile="`echo $file | sed -e 's/\.sma$/\.amxx/'`"
+          echo -e "\nCompiling $(basename $file)..."
+          ./amxxpc $(basename $file) -o$ARTIFACTS_DIR/$(basename "$amxfile")
           done
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
