@@ -40,7 +40,7 @@ jobs:
       - name: Prepare files for compilation
         run: |
           cp -r -v $REPO_SCRIPTING_DIR addons/amxmodx/
-          cp -r -v scriptin addons/amxmodx
+          cp -r -v scripting addons/amxmodx
       - name: Compile Plugin(s)
         run: |
           mkdir $ARTIFACTS_DIR
@@ -92,7 +92,7 @@ jobs:
       - name: Prepare files for compilation
         run: |
           cp -r -v $REPO_SCRIPTING_DIR addons/amxmodx/
-          cp -r -v scriptin addons/amxmodx
+          cp -r -v scripting addons/amxmodx
       - name: Compile Plugin(s)
         run: |
           mkdir $ARTIFACTS_DIR
