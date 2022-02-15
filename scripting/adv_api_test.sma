@@ -14,13 +14,21 @@ public plugin_init()
 
 public player_kick_pre(id, szPlayerData[PlayerData])
 {
+	#if defined USE_REAPI
 	server_print("player_kick_pre(): id (%d) Name: (%s) Password: (%s) IP: (%s)^n", id, szPlayerData[szName], szPlayerData[szPassword], szPlayerData[szIP])
+	#else 
+	server_print("player_kick_pre(): id (%d) Name: (%s) Password: (%s)^n", id, szPlayerData[szName], szPlayerData[szPassword])
+	#endif
 	return SLOT_KICK_NO
 }
 
 public player_kick_post(id, szPlayerData[PlayerData])
 {
+	#if defined USE_REAPI
 	server_print("player_kick_post(): id (%d) Name: (%s) Password: (%s) IP: (%s)^n", id, szPlayerData[szName], szPlayerData[szPassword], szPlayerData[szIP])
+	#else 
+	server_print("player_kick_pre(): id (%d) Name: (%s) Password: (%s)^n", id, szPlayerData[szName], szPlayerData[szPassword])
+	#endif
 }
 
 public player_check_playtime(iPlayers[MAX_PLAYERS], iNum)

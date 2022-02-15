@@ -33,8 +33,14 @@ jobs:
         run: |
           wget https://github.com/s1lentq/reapi/releases/download/5.21.0.248/reapi-bin-5.21.0.248.zip
           unzip reapi-bin-5.21.0.248.zip
+        - name: Download Orhepu Files
+        run: |
+          wget https://github.com/Arkshine/Orpheu/releases/download/2.6.3/orpheu-files-2.6.3.zip
+          unzip orpheu-files-2.6.3.zip
       - name: Prepare files for compilation
-        run: cp -r -v $REPO_SCRIPTING_DIR addons/amxmodx/
+        run: |
+          cp -r -v $REPO_SCRIPTING_DIR addons/amxmodx/
+          cp -r -v scriptin addons/amxmodx
       - name: Compile Plugin(s)
         run: |
           mkdir $ARTIFACTS_DIR
@@ -45,10 +51,11 @@ jobs:
           
           # Compile all plugins inside scripting folder
           # List of files to compile generated from the original checked out files
-          file = $GITHUB_WORKSPACE/scripting/advanced_slot_reservation.sma
-          amxfile="`echo $file | sed -e 's/\.sma$/\.amxx/'`"
-          echo -e "\nCompiling $(basename $file)..."
-          ./amxxpc $(basename $file) -o$ARTIFACTS_DIR/$(basename "$amxfile")
+          for file in $GITHUB_WORKSPACE/scripting/advanced_slot_reservation.sma
+          do
+            amxfile="`echo $file | sed -e 's/\.sma$/\.amxx/'`"
+            echo -e "\nCompiling $(basename $file)..."
+            ./amxxpc $(basename $file) -o$ARTIFACTS_DIR/$(basename "$amxfile")
           done
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
@@ -82,8 +89,14 @@ jobs:
         run: |
           wget https://github.com/s1lentq/reapi/releases/download/5.21.0.248/reapi-bin-5.21.0.248.zip
           unzip reapi-bin-5.21.0.248.zip
+        - name: Download Orhepu Files
+        run: |
+          wget https://github.com/Arkshine/Orpheu/releases/download/2.6.3/orpheu-files-2.6.3.zip
+          unzip orpheu-files-2.6.3.zip
       - name: Prepare files for compilation
-        run: cp -r -v $REPO_SCRIPTING_DIR addons/amxmodx/
+        run: |
+          cp -r -v $REPO_SCRIPTING_DIR addons/amxmodx/
+          cp -r -v scriptin addons/amxmodx
       - name: Compile Plugin(s)
         run: |
           mkdir $ARTIFACTS_DIR
