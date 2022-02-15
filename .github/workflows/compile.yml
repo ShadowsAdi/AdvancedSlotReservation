@@ -47,10 +47,11 @@ jobs:
           # List of files to compile generated from the original checked out files
           for file in $GITHUB_WORKSPACE/scripting/*.sma
           do
-            if [[ $file != "adv_test_api" ]]
-                amxfile="`echo $file | sed -e 's/\.sma$/\.amxx/'`"
-                echo -e "\nCompiling $(basename $file)..."
-                ./amxxpc $(basename $file) -o$ARTIFACTS_DIR/$(basename "$amxfile")
+            if [[ $file == "adv_test_api" ]] then
+                continue
+            amxfile="`echo $file | sed -e 's/\.sma$/\.amxx/'`"
+            echo -e "\nCompiling $(basename $file)..."
+            ./amxxpc $(basename $file) -o$ARTIFACTS_DIR/$(basename "$amxfile")
           done
       - name: Upload Artifacts
         uses: actions/upload-artifact@v2
