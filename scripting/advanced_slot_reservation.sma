@@ -3,7 +3,7 @@
 /* 	Uncomment this line to use reAPI Support.
 	NOTE! Only reAPI can use reservation of the IP address! 
 */
-//#define USE_REAPI
+#define USE_REAPI
 
 #include <amxmodx>
 #include <amxmisc>
